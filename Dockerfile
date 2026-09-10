@@ -26,9 +26,11 @@ RUN if [ "$PRELOAD_MODELS" = "true" ]; then \
       python -c "from cccd_service.ocr import get_ocr_engine; get_ocr_engine()"; \
     fi
 
+ENV PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
+
 EXPOSE 8002
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health', timeout=3)"
+  CMD python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.getenv('PORT', '8002') + '/health', timeout=3)"
 
-CMD ["uvicorn", "cccd_service.main:app", "--host", "0.0.0.0", "--port", "8002", "--workers", "1"]
+CMD ["sh", "-c", "exec uvicorn cccd_service.main:app --host 0.0.0.0 --port \"${PORT:-8002}\" --workers 1 --no-server-header"]

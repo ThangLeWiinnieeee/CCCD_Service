@@ -1,5 +1,7 @@
 from functools import lru_cache
+from typing import Self
 
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,6 +13,10 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    environment: str = Field(
+        default="development",
+        validation_alias=AliasChoices("CCCD_ENVIRONMENT", "NODE_ENV"),
+    )
     app_name: str = "WebTutorCenter CCCD Service"
     internal_secret: str = ""
     max_image_bytes: int = 8 * 1024 * 1024
@@ -27,6 +33,16 @@ class Settings(BaseSettings):
     ocr_device: str = "cpu"
     ocr_cpu_threads: int = 4
     model_version: str = "cccd-verify-0.1.0"
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.casefold() == "production"
+
+    @model_validator(mode="after")
+    def require_production_secret(self) -> Self:
+        if self.is_production and len(self.internal_secret.strip()) < 32:
+            raise ValueError("CCCD_INTERNAL_SECRET must have at least 32 characters in production")
+        return self
 
 
 @lru_cache(maxsize=1)

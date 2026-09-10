@@ -1,4 +1,3 @@
-import hmac
 import logging
 from datetime import date
 from typing import Annotated
@@ -24,7 +23,6 @@ async def verify(
     claimed_gender: Annotated[str | None, Form(max_length=20)] = None,
     x_internal_secret: Annotated[str | None, Header()] = None,
 ) -> VerificationResult:
-    _verify_secret(x_internal_secret)
     front_bytes, back_bytes = await _read_images(front, back)
     claimed = ClaimedIdentity(
         full_name=claimed_full_name,
@@ -44,15 +42,6 @@ async def verify(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Không thể xử lý CCCD lúc này",
         ) from error
-
-
-def _verify_secret(provided: str | None) -> None:
-    expected = get_settings().internal_secret
-    if expected and not hmac.compare_digest(provided or "", expected):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Sai hoặc thiếu internal secret",
-        )
 
 
 async def _read_images(front: UploadFile, back: UploadFile) -> tuple[bytes, bytes]:

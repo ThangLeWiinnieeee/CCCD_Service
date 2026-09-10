@@ -22,6 +22,8 @@ docker run --rm -p 8002:8002 \
   webtutorcenter-cccd
 ```
 
+Container đọc biến `PORT` do nền tảng cấp và mặc định dùng `8002` khi chạy local.
+
 Docker mặc định tải model vào image trong lúc build để lúc chạy không cần tải lại. Khi chỉ
 muốn kiểm tra nhanh Dockerfile mà chưa tải model:
 
@@ -75,6 +77,39 @@ curl -X POST http://localhost:8002/api/verify \
 ```
 
 Swagger UI có tại `http://localhost:8002/docs`.
+
+## Deploy Google Cloud Run để test production
+
+Chạy từ thư mục `cccd-service`. Tạo một secret ngẫu nhiên tối thiểu 32 ký tự (ví dụ
+`openssl rand -hex 32`) và dùng cùng giá trị đó cho Backend.
+
+```bash
+gcloud run deploy webtutor-cccd \
+  --source . \
+  --region asia-southeast1 \
+  --execution-environment gen2 \
+  --allow-unauthenticated \
+  --cpu 2 \
+  --memory 4Gi \
+  --concurrency 1 \
+  --min-instances 0 \
+  --max-instances 1 \
+  --timeout 110s \
+  --set-env-vars NODE_ENV=production,CCCD_INTERNAL_SECRET=replace-with-a-random-64-character-secret,CCCD_OCR_DEVICE=cpu,CCCD_OCR_CPU_THREADS=2
+```
+
+Cloud Run tự cấp `PORT`. Khi `NODE_ENV=production`, service bắt buộc secret mạnh, nạp
+OCR trước khi sẵn sàng nhận request, đồng thời tắt `/docs`, `/redoc` và
+`/openapi.json`. `/health` vẫn public; mọi route dưới `/api/` bị chặn trước khi đọc
+multipart nếu thiếu hoặc sai `X-Internal-Secret`.
+
+Cấu hình URL do Cloud Run trả về cho Backend:
+
+```env
+CCCD_URL=https://webtutor-cccd-xxxxx.asia-southeast1.run.app
+CCCD_INTERNAL_SECRET=<cùng secret đã đặt trên Cloud Run>
+CCCD_TIMEOUT_MS=90000
+```
 
 ## Kiểm tra code
 
